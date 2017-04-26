@@ -1,10 +1,10 @@
 [submodule "third_party/zlib"]
 	path = third_party/zlib
-	url = https://github.com/madler/zlib
+	url = https://github.com/flener/zlib
 [submodule "third_party/protobuf"]
 	path = third_party/protobuf
-	url = https://github.com/google/protobuf.git
-	branch = 3.0.x
+	url = https://github.com/flener/protobuf.git
+	branch = cross_3.0.x
 [submodule "third_party/gflags"]
 	path = third_party/gflags
 	url = https://github.com/gflags/gflags.git
