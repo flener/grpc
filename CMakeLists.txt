@@ -72,7 +72,22 @@ set_property(CACHE gRPC_GFLAGS_PROVIDER PROPERTY STRINGS "module" "package")
 set(gRPC_BENCHMARK_PROVIDER "module" CACHE STRING "Provider of benchmark library")
 set_property(CACHE gRPC_BENCHMARK_PROVIDER PROPERTY STRINGS "module" "package")
 
+set(gRPC_ANDROID_IFADDRS_PROVIDER "module" CACHE STRING "Provider of android-ifaddrs implementation")
+set_property(CACHE gRPC_ANDROID_IFADDRS_PROVIDER PROPERTY STRINGS "module" "package")
+
 set(gRPC_USE_PROTO_LITE OFF CACHE BOOL "Use the protobuf-lite library")
+
+macro(ADD_ANDROID_IFADDRS_DEPS DEP)
+    if(ANDROID)
+        target_include_directories(${DEP}
+            PRIVATE ${ANDROID_IFADDRS_ROOT_DIR}
+            )
+        target_link_libraries(${DEP}
+            android_ifaddrs
+            )
+    endif()
+endmacro()
+
 
 if(UNIX)
   if(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
@@ -82,6 +97,12 @@ if(UNIX)
   else()
     set(_gRPC_PLATFORM_POSIX ON)
   endif()
+  # Configure CCache if available
+  find_program(CCACHE_FOUND ccache)
+  if(CCACHE_FOUND)
+      set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE ccache)
+      set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK ccache)
+  endif(CCACHE_FOUND)
 endif()
 if(WIN32)
   set(_gRPC_PLATFORM_WINDOWS ON)
@@ -231,13 +252,30 @@ elseif("${gRPC_BENCHMARK_PROVIDER}" STREQUAL "package")
   set(_gRPC_FIND_BENCHMARK "if(NOT benchmark_FOUND)\n  find_package(benchmark)\nendif()")
 endif()
 
+if("${gRPC_ANDROID_IFADDRS_PROVIDER}" STREQUAL "module")
+    if(NOT ANDROID_IFADDRS_ROOT_DIR)
+        set(ANDROID_IFADDRS_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/android-ifaddrs)
+    endif()
+    
+    if(EXISTS "${ANDROID_IFADDRS_ROOT_DIR}/CMakeLists.txt")
+        add_subdirectory(${ANDROID_IFADDRS_ROOT_DIR} third_party/android-ifaddrs) 
+    endif()
+endif()
+
+
+
 if(NOT MSVC)
   set(CMAKE_C_FLAGS   "${CMAKE_C_FLAGS} -std=c99")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 endif()
 
 if(UNIX)
-  set(_gRPC_ALLTARGETS_LIBRARIES dl rt m pthread)
+  set(_gRPC_ALLTARGETS_LIBRARIES dl m)
+  if(NOT ANDROID)
+      list(APPEND _gRPC_ALLTARGETS_LIBRARIES rt pthread)
+  else()
+      list(APPEND _gRPC_ALLTARGETS_LIBRARIES log)
+  endif()
 endif()
 
 if(WIN32 AND MSVC)
@@ -754,6 +792,7 @@ target_include_directories(gpr
   PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/third_party/gflags/include
 )
 
+
 target_link_libraries(gpr
   ${_gRPC_ALLTARGETS_LIBRARIES}
 )
@@ -1096,11 +1135,11 @@ target_include_directories(grpc
   PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include
   PRIVATE ${BORINGSSL_ROOT_DIR}/include
   PRIVATE ${PROTOBUF_ROOT_DIR}/src
-  PRIVATE ${ZLIB_INCLUDE_DIR}
   PRIVATE ${BENCHMARK}/include
   PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/third_party/zlib
   PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/third_party/gflags/include
 )
+
 
 target_link_libraries(grpc
   ${_gRPC_BASELIB_LIBRARIES}
@@ -1108,7 +1147,11 @@ target_link_libraries(grpc
   ${_gRPC_ZLIB_LIBRARIES}
   ${_gRPC_ALLTARGETS_LIBRARIES}
   gpr
+  android_ifaddrs
 )
+
+add_android_ifaddrs_deps(grpc)
+
 
 foreach(_hdr
   include/grpc/byte_buffer.h
@@ -1390,6 +1433,8 @@ target_link_libraries(grpc_cronet
   gpr
 )
 
+add_android_ifaddrs_deps(grpc_cronet)
+
 foreach(_hdr
   include/grpc/byte_buffer.h
   include/grpc/byte_buffer_reader.h
@@ -1611,6 +1656,8 @@ target_link_libraries(grpc_test_util
   gpr
   grpc
 )
+
+add_android_ifaddrs_deps(grpc_test_util)
 
 foreach(_hdr
   include/grpc/byte_buffer.h
@@ -1932,6 +1979,8 @@ target_link_libraries(grpc_unsecure
   ${_gRPC_ALLTARGETS_LIBRARIES}
   gpr
 )
+
+add_android_ifaddrs_deps(grpc_unsecure)
 
 foreach(_hdr
   include/grpc/byte_buffer.h
@@ -2506,6 +2555,8 @@ target_link_libraries(grpc++_cronet
   gpr
   grpc_cronet
 )
+
+add_android_ifaddrs_deps(grpc++_cronet)
 
 foreach(_hdr
   include/grpc++/alarm.h
@@ -5739,8 +5790,10 @@ target_link_libraries(grpc_print_google_default_creds_token
   ${_gRPC_ALLTARGETS_LIBRARIES}
   grpc
   gpr
+  log
 )
 
+add_android_ifaddrs_deps(grpc_print_google_default_creds_token)
 
 if (gRPC_INSTALL)
   install(TARGETS grpc_print_google_default_creds_token EXPORT gRPCTargets
