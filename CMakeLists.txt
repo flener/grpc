@@ -88,6 +88,9 @@ macro(ADD_ANDROID_IFADDRS_DEPS DEP)
     endif()
 endmacro()
 
+if(ANDROID AND NOT NATIVE_EXECUTABLES_PATH)
+    message(FATAL_ERROR "NATIVE_EXECUTABLES_PATH must be set when cross crompiling(location of protoc and grpc_*")
+endif()
 
 if(UNIX)
   if(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
@@ -252,7 +255,7 @@ elseif("${gRPC_BENCHMARK_PROVIDER}" STREQUAL "package")
   set(_gRPC_FIND_BENCHMARK "if(NOT benchmark_FOUND)\n  find_package(benchmark)\nendif()")
 endif()
 
-if("${gRPC_ANDROID_IFADDRS_PROVIDER}" STREQUAL "module")
+if("${gRPC_ANDROID_IFADDRS_PROVIDER}" STREQUAL "module" AND ANDROID)
     if(NOT ANDROID_IFADDRS_ROOT_DIR)
         set(ANDROID_IFADDRS_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/android-ifaddrs)
     endif()
@@ -315,16 +318,24 @@ function(protobuf_generate_grpc_cpp)
     file(RELATIVE_PATH REL_FIL ${CMAKE_SOURCE_DIR} ${ABS_FIL})
     get_filename_component(REL_DIR ${REL_FIL} DIRECTORY)
     set(RELFIL_WE "${REL_DIR}/${FIL_WE}")
-    
+   
+
+    if(ANDROID)
+        set(GRPC_CPP_PLUGIN_EXECUTABLE ${NATIVE_EXECUTABLES_PATH}/grpc_cpp_plugin)
+        set(PROTOC_EXECUTABLE ${NATIVE_EXECUTABLES_PATH}/protoc)
+    else()
+        set(GRPC_CPP_PLUGIN_EXECUTABLE $<TARGET_FILE:grpc_cpp_plugin>)
+        set(PROTOC_EXECUTABLE ${_gRPC_PROTOBUF_PROTOC})
+    endif()
     add_custom_command(
       OUTPUT "${_gRPC_PROTO_GENS_DIR}/${RELFIL_WE}.grpc.pb.cc"
              "${_gRPC_PROTO_GENS_DIR}/${RELFIL_WE}.grpc.pb.h"
              "${_gRPC_PROTO_GENS_DIR}/${RELFIL_WE}.pb.cc"
              "${_gRPC_PROTO_GENS_DIR}/${RELFIL_WE}.pb.h"
-      COMMAND ${_gRPC_PROTOBUF_PROTOC}
+      COMMAND ${PROTOC_EXECUTABLE}
       ARGS --grpc_out=${_gRPC_PROTO_GENS_DIR}
            --cpp_out=${_gRPC_PROTO_GENS_DIR}
-           --plugin=protoc-gen-grpc=$<TARGET_FILE:grpc_cpp_plugin>
+           --plugin=protoc-gen-grpc=${GRPC_CPP_PLUGIN_EXECUTABLE}
            ${_protobuf_include_path}
            ${REL_FIL}
       DEPENDS ${ABS_FIL} ${_gRPC_PROTOBUF_PROTOC} grpc_cpp_plugin
@@ -1147,7 +1158,6 @@ target_link_libraries(grpc
   ${_gRPC_ZLIB_LIBRARIES}
   ${_gRPC_ALLTARGETS_LIBRARIES}
   gpr
-  android_ifaddrs
 )
 
 add_android_ifaddrs_deps(grpc)
@@ -5790,8 +5800,12 @@ target_link_libraries(grpc_print_google_default_creds_token
   ${_gRPC_ALLTARGETS_LIBRARIES}
   grpc
   gpr
-  log
 )
+
+if(ANDROID)
+    target_link_libraries(grpc_print_google_default_creds_token
+    log)
+endif()
 
 add_android_ifaddrs_deps(grpc_print_google_default_creds_token)
 
