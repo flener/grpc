@@ -274,10 +274,21 @@ endif()
 
 if(UNIX)
   set(_gRPC_ALLTARGETS_LIBRARIES dl m)
+  if(ANDROID)
+    list(APPEND _gRPC_ALLTARGETS_LIBRARIES log)
+  endif()
+
+  #MAC/IOS and Linux
   if(NOT ANDROID)
-      list(APPEND _gRPC_ALLTARGETS_LIBRARIES rt pthread)
-  else()
-      list(APPEND _gRPC_ALLTARGETS_LIBRARIES log)
+	list(APPEND _gRPC_ALLTARGETS_LIBRARIES pthread) 
+  endif()
+
+  if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+    list(APPEND _gRPC_ALLTARGETS_LIBRARIES stdc++)
+  endif()
+
+  if(LINUX AND NOT ANDROID)
+      list(APPEND _gRPC_ALLTARGETS_LIBRARIES rt)
   endif()
 endif()
 
