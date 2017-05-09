@@ -48,6 +48,8 @@ set(PACKAGE_TARNAME   "${PACKAGE_NAME}-${PACKAGE_VERSION}")
 set(PACKAGE_BUGREPORT "https://github.com/grpc/grpc/issues/")
 project(${PACKAGE_NAME} C CXX)
 
+include(${CMAKE_CURRENT_SOURCE_DIR}/../../cmake/exclude_executables.cmake)
+
 # Options
 option(gRPC_BUILD_TESTS "Build tests" OFF)
 
@@ -331,12 +333,14 @@ function(protobuf_generate_grpc_cpp)
     set(RELFIL_WE "${REL_DIR}/${FIL_WE}")
    
 
-    if(ANDROID)
+    if(NATIVE_EXECUTABLES_PATH)
         set(GRPC_CPP_PLUGIN_EXECUTABLE ${NATIVE_EXECUTABLES_PATH}/grpc_cpp_plugin)
         set(PROTOC_EXECUTABLE ${NATIVE_EXECUTABLES_PATH}/protoc)
     else()
         set(GRPC_CPP_PLUGIN_EXECUTABLE $<TARGET_FILE:grpc_cpp_plugin>)
         set(PROTOC_EXECUTABLE ${_gRPC_PROTOBUF_PROTOC})
+		#only depends if not using native_executables_path
+		set(GRPC_CPP_PLUGIN_DEPENDENCY grpc_cpp_plugin)
     endif()
     add_custom_command(
       OUTPUT "${_gRPC_PROTO_GENS_DIR}/${RELFIL_WE}.grpc.pb.cc"
@@ -349,7 +353,7 @@ function(protobuf_generate_grpc_cpp)
            --plugin=protoc-gen-grpc=${GRPC_CPP_PLUGIN_EXECUTABLE}
            ${_protobuf_include_path}
            ${REL_FIL}
-      DEPENDS ${ABS_FIL} ${_gRPC_PROTOBUF_PROTOC} grpc_cpp_plugin
+      DEPENDS ${ABS_FIL} ${_gRPC_PROTOBUF_PROTOC} ${GRPC_CPP_PLUGIN_DEPENDENCY}
       WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
       COMMENT "Running gRPC C++ protocol buffer compiler on ${FIL}"
       VERBATIM)
